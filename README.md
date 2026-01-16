@@ -1,72 +1,136 @@
-# Claude Code
+# Claude Azure
 
-![](https://img.shields.io/badge/Node.js-18%2B-brightgreen?style=flat-square) [![npm]](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+> **Fork of [Claude Code](https://github.com/anthropics/claude-code) with native Azure OpenAI support**
 
-[npm]: https://img.shields.io/npm/v/@anthropic-ai/claude-code.svg?style=flat-square
+Use **Claude Code** with **Azure OpenAI**, OpenAI, or Anthropic - your choice!
 
-Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows -- all through natural language commands. Use it in your terminal, IDE, or tag @claude on Github.
+## Quick Start
 
-**Learn more in the [official documentation](https://code.claude.com/docs/en/overview)**.
+```bash
+# Clone and install
+git clone https://github.com/schwarztim/claude-code.git ~/Scripts/claude-azure
+cd ~/Scripts/claude-azure
+npm install
+npm run build
+npm link
 
-<img src="./demo.gif" />
+# Run (wizard will guide you)
+claude-azure
+```
 
-## Get started
-> [!NOTE]
-> Installation via npm is deprecated. Use one of the recommended methods below.
+## Setup Wizard
 
-For more installation options, uninstall steps, and troubleshooting, see the [setup documentation](https://code.claude.com/docs/en/setup).
+When you run `claude-azure`, it presents a setup wizard:
 
-1. Install Claude Code:
+```
+  Claude Azure Setup
+  ─────────────────────────────────────
 
-    **MacOS/Linux (Recommended):**
-    ```bash
-    curl -fsSL https://claude.ai/install.sh | bash
-    ```
+? Select your AI provider:
+❯ Azure OpenAI - Use Azure-hosted models
+  OpenAI - Use OpenAI API directly
+  Anthropic - Use Anthropic API directly
+```
 
-    **Homebrew (MacOS/Linux):**
-    ```bash
-    brew install --cask claude-code
-    ```
+Then for Azure, enter your credentials:
+```
+Azure OpenAI Configuration
+Get these from Azure Portal → Azure OpenAI → Keys and Endpoint
 
-    **Windows (Recommended):**
-    ```powershell
-    irm https://claude.ai/install.ps1 | iex
-    ```
+? Azure OpenAI Endpoint: https://myresource.openai.azure.com
+? Azure OpenAI API Key: ********
+? API Version: 2024-12-01-preview
 
-    **WinGet (Windows):**
-    ```powershell
-    winget install Anthropic.ClaudeCode
-    ```
+Model Deployments
+? Opus/Large model deployment: gpt-4o
+? Sonnet/Medium model deployment: gpt-4o
+? Haiku/Small model deployment: gpt-4o-mini
 
-    **NPM (Deprecated):**
-    ```bash
-    npm install -g @anthropic-ai/claude-code
-    ```
+✔ Testing Azure connection...
+✓ Configuration saved!
+```
 
-2. Navigate to your project directory and run `claude`.
+## Usage
 
-## Plugins
+```bash
+# First run - setup wizard
+claude-azure
 
-This repository includes several Claude Code plugins that extend functionality with custom commands and agents. See the [plugins directory](./plugins/README.md) for detailed documentation on available plugins.
+# Reconfigure
+claude-azure --setup
 
-## Reporting Bugs
+# Show proxy logs
+claude-azure --verbose
 
-We welcome your feedback. Use the `/bug` command to report issues directly within Claude Code, or file a [GitHub issue](https://github.com/anthropics/claude-code/issues).
+# Reset all config
+claude-azure --reset
 
-## Connect on Discord
+# Pass any args to Claude Code
+claude-azure -p "explain this codebase"
+```
 
-Join the [Claude Developers Discord](https://anthropic.com/discord) to connect with other developers using Claude Code. Get help, share feedback, and discuss your projects with the community.
+## Configuration
 
-## Data collection, usage, and retention
+Config stored in `~/.claude-azure/config.json`
 
-When you use Claude Code, we collect feedback, which includes usage data (such as code acceptance or rejections), associated conversation data, and user feedback submitted via the `/bug` command.
+### Model Mapping
 
-### How we use your data
+| Claude Model | Maps To Your Deployment |
+|--------------|-------------------------|
+| claude-opus-* | "opus" (e.g., gpt-4o) |
+| claude-sonnet-* | "sonnet" (e.g., gpt-4o) |
+| claude-haiku-* | "haiku" (e.g., gpt-4o-mini) |
 
-See our [data usage policies](https://code.claude.com/docs/en/data-usage).
+## How It Works
 
-### Privacy safeguards
+```
+┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
+│   Claude Code   │───▶│ Local Proxy  │───▶│  Azure OpenAI   │
+│                 │    │ (port auto)  │    │                 │
+│ ANTHROPIC_BASE  │    │ Translates:  │    │ /chat/complete  │
+│ _URL=localhost  │    │ Anthropic→   │    │                 │
+│                 │    │ OpenAI       │    │                 │
+└─────────────────┘    └──────────────┘    └─────────────────┘
+```
 
-We have implemented several safeguards to protect your data, including limited retention periods for sensitive information, restricted access to user session data, and clear policies against using feedback for model training.
+For Anthropic provider, it passes through directly (no proxy needed).
 
-For full details, please review our [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms) and [Privacy Policy](https://www.anthropic.com/legal/privacy).
+## Keeping Up to Date
+
+Sync with upstream Claude Code:
+
+```bash
+cd ~/Scripts/claude-azure
+git fetch upstream
+git merge upstream/main
+npm run build
+```
+
+## Prerequisites
+
+1. **Claude Code** must be installed first:
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+
+2. **Azure OpenAI** resource with deployed models
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| "Claude Code not found" | Install from https://claude.ai/code |
+| Connection errors | Check endpoint/key in `~/.claude-azure/config.json` |
+| Tool calls not working | Run with `--verbose` to see proxy logs |
+
+---
+
+## Original Claude Code
+
+This is a fork of [Claude Code](https://github.com/anthropics/claude-code), an agentic coding tool that lives in your terminal.
+
+For official documentation, see [code.claude.com](https://code.claude.com/docs/en/overview).
+
+## License
+
+MIT (azure wrapper) / Original Claude Code license applies to upstream code

@@ -1,0 +1,37 @@
+{
+  "name": "claude-azure",
+  "version": "1.0.0",
+  "description": "Claude Code with native Azure OpenAI support",
+  "main": "dist/index.js",
+  "bin": {
+    "claude-azure": "dist/cli.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "claude",
+    "azure",
+    "openai",
+    "ai",
+    "cli"
+  ],
+  "author": "Tim Schwarz",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "conf": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "ora": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,191 @@
+#!/usr/bin/env node
+/**
+ * Claude Azure CLI - Claude Code with native Azure OpenAI support
+ */
+import { spawn, execFileSync } from 'child_process';
+import { createServer } from 'net';
+import { existsSync } from 'fs';
+import chalk from 'chalk';
+import ora from 'ora';
+import { program } from 'commander';
+import { getConfig, configExists, clearConfig } from './config.js';
+import { runWizard } from './wizard.js';
+import { startProxy } from './proxy.js';
+
+// Find a free port
+function findFreePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+// Find claude binary using which command safely
+function findClaude(): string | null {
+  // Common paths to check
+  const commonPaths = [
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    `${process.env.HOME}/.local/bin/claude`,
+    `${process.env.HOME}/.claude/bin/claude`,
+  ];
+
+  // Check common paths first
+  for (const path of commonPaths) {
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+
+  // Try using which command
+  try {
+    const result = execFileSync('which', ['claude'], { encoding: 'utf-8' }).trim();
+    return result || null;
+  } catch {
+    return null;
+  }
+}
+
+// Wait for proxy to be ready
+async function waitForProxy(port: number, timeout = 10000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/health`);
+      if (res.ok) return true;
+    } catch {
+      // Keep trying
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
+
+async function main() {
+  program
+    .name('claude-azure')
+    .description('Claude Code with native Azure OpenAI support')
+    .version('1.0.0')
+    .option('--setup', 'Run the setup wizard')
+    .option('--reconfigure', 'Reconfigure settings')
+    .option('--verbose', 'Show proxy logs')
+    .option('--reset', 'Clear all configuration')
+    .allowUnknownOption(true)
+    .parse();
+
+  const options = program.opts();
+  const claudeArgs = program.args;
+
+  // Handle reset
+  if (options.reset) {
+    clearConfig();
+    console.log(chalk.green('✓') + ' Configuration cleared');
+    process.exit(0);
+  }
+
+  // Handle setup/reconfigure
+  if (options.setup || options.reconfigure) {
+    await runWizard();
+    if (claudeArgs.length === 0) {
+      process.exit(0);
+    }
+  }
+
+  // Check for configuration
+  if (!configExists()) {
+    console.log();
+    console.log(chalk.cyan.bold('  Welcome to Claude Azure!'));
+    console.log(chalk.gray('  Use Claude Code with Azure OpenAI, OpenAI, or Anthropic'));
+    console.log();
+    await runWizard();
+  }
+
+  const config = getConfig();
+  if (!config) {
+    console.error(chalk.red('Error:') + ' No configuration found. Run with --setup');
+    process.exit(1);
+  }
+
+  // Find claude binary
+  const claudeBinary = findClaude();
+  if (!claudeBinary) {
+    console.error(chalk.red('Error:') + ' Claude Code not found. Install from https://claude.ai/code');
+    process.exit(1);
+  }
+
+  // Direct passthrough for Anthropic
+  if (config.provider === 'anthropic') {
+    console.log(chalk.yellow('◖A◗') + chalk.gray(' Using Anthropic directly'));
+    const env = { ...process.env, ANTHROPIC_API_KEY: config.anthropic!.apiKey };
+    const child = spawn(claudeBinary, claudeArgs, { env, stdio: 'inherit' });
+    child.on('exit', (code) => process.exit(code || 0));
+    return;
+  }
+
+  // Need proxy for Azure/OpenAI
+  const port = await findFreePort();
+
+  // Show banner
+  console.log();
+  console.log(
+    config.provider === 'azure'
+      ? chalk.blue('  ◖A◗') + chalk.gray(' Claude Azure')
+      : chalk.green('  ◖O◗') + chalk.gray(' Claude OpenAI')
+  );
+  console.log();
+
+  // Start proxy
+  const spinner = ora('Starting proxy...').start();
+
+  if (config.provider === 'azure' && config.azure) {
+    await startProxy({
+      port,
+      azure: config.azure,
+      verbose: !!options.verbose,
+    });
+  } else if (config.provider === 'openai' && config.openai) {
+    // TODO: Add OpenAI proxy support
+    spinner.fail('OpenAI proxy not yet implemented');
+    process.exit(1);
+  }
+
+  // Wait for proxy
+  const ready = await waitForProxy(port);
+  if (!ready) {
+    spinner.fail('Proxy failed to start');
+    process.exit(1);
+  }
+
+  spinner.succeed(`Proxy ready on port ${port}`);
+  console.log();
+
+  // Launch Claude with proxy
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
+  };
+  delete env.ANTHROPIC_API_KEY; // Remove any existing key
+
+  const child = spawn(claudeBinary, claudeArgs, { env, stdio: 'inherit' });
+
+  // Handle signals
+  process.on('SIGINT', () => {
+    child.kill('SIGINT');
+  });
+  process.on('SIGTERM', () => {
+    child.kill('SIGTERM');
+  });
+
+  child.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+}
+
+main().catch((err) => {
+  console.error(chalk.red('Error:'), err.message);
+  process.exit(1);
+});
