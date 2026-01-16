@@ -118,7 +118,7 @@ export function createProxy(config: ProxyConfig): http.Server {
       const openaiReq: any = {
         model: mapModel(anthropicReq.model, azure),
         messages: convertMessages(anthropicReq.messages, anthropicReq.system),
-        max_tokens: anthropicReq.max_tokens || 4096,
+        max_completion_tokens: anthropicReq.max_tokens || 4096,
         temperature: anthropicReq.temperature ?? 1,
         stream: isStreaming,
       };
@@ -153,8 +153,12 @@ export function createProxy(config: ProxyConfig): http.Server {
       }
     } catch (error: any) {
       console.error('[PROXY] Error:', error.message);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error.message }));
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+      }
+      if (!res.writableEnded) {
+        res.end(JSON.stringify({ error: error.message }));
+      }
     }
   });
 
